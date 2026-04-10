@@ -16,7 +16,6 @@ contract PaymentLink {
     mapping(bytes32 => Link) public links;
 
     // tracks all linkIds per creator wallet for payment history.
-
     mapping(address => bytes32[]) public creatorLinks;
 
     event LinkCreated(bytes32 indexed linkId, address indexed creator, uint256 amount, string description);
