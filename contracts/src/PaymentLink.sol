@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 // PaymentLink contract: createLink, pay, getLink, getCreatorLinks
 
 contract PaymentLink {
-
     struct Link {
         address payable creator;
         uint256 amount;
@@ -20,7 +19,6 @@ contract PaymentLink {
 
     mapping(address => bytes32[]) public creatorLinks;
 
-
     event LinkCreated(bytes32 indexed linkId, address indexed creator, uint256 amount, string description);
 
     event LinkPaid(bytes32 indexed linkId, address indexed payer, uint256 paidAt);
@@ -31,7 +29,6 @@ contract PaymentLink {
     error WrongAmount();
 
     function createLink(bytes32 linkId, uint256 amount, string calldata description) external {
-        
         if (links[linkId].creator != address(0)) revert LinkExists();
 
         links[linkId] = Link(payable(msg.sender), amount, description, false, address(0), 0);
@@ -39,13 +36,20 @@ contract PaymentLink {
         creatorLinks[msg.sender].push(linkId);
 
         emit LinkCreated(linkId, msg.sender, amount, description);
-        
     }
 
     function pay(bytes32 linkId) external payable {
         Link storage link = links[linkId];
-        if(link.creator == address(0)) revert LinkNotFound();
+        if (link.creator == address(0)) revert LinkNotFound();
+        if (link.paid) revert AlreadyPaid();
+        if (msg.value != link.amount) revert WrongAmount();
+
+        link.paid = true;
+        link.payer = msg.sender;
+        link.paidAt = block.timestamp;
+
+        (bool success,) = link.creator.call{value: msg.value}("");
+        require(success, "Transfer failed");
+        emit LinkPaid(linkId, msg.sender, block.timestamp);
     }
-
-
 }
