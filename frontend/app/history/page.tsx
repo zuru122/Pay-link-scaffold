@@ -1,1 +1,3 @@
-// History page: fetches all creator links, renders paid/unpaid receipt cards
+export default function HistoryPage() {
+  return null;
+}
