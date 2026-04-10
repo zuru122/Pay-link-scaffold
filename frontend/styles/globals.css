@@ -1,1 +1,25 @@
-// CSS variables: --bg, --surface, --primary, --highlight, --border, --success, --error, --text, --text-muted, --radius, --glow-purple, --glow-green
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg:           #0E091C;
+  --surface:      #160D2E;
+  --primary:      #6E54FF;
+  --highlight:    #DDD7FE;
+  --border:       rgba(110, 84, 255, 0.18);
+  --success:      #3DDC97;
+  --error:        #FF5A5A;
+  --text:         #FFFFFF;
+  --text-muted:   rgba(221, 215, 254, 0.55);
+  --glow-purple:  0 0 24px rgba(110, 84, 255, 0.35);
+  --glow-green:   0 0 24px rgba(61, 220, 151, 0.35);
+  --transition:   0.2s ease;
+  --radius:       12px;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+}
