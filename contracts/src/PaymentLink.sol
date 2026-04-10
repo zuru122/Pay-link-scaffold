@@ -52,4 +52,21 @@ contract PaymentLink {
         require(success, "Transfer failed");
         emit LinkPaid(linkId, msg.sender, block.timestamp);
     }
+
+    function getLink(bytes32 linkId) external view returns (
+        address creator,
+        uint256 amount,
+        string memory description,
+        bool paid,
+        address payer,
+        uint256 paidAt
+    ) {
+        Link memory link = links[linkId];
+        return (link.creator, link.amount, link.description, link.paid, link.paidAt);
+    }
+
+    // Returns all linkIds created by a wallet.
+    function getCreatorLinks(address creator) external view returns(bytes32[] memory) {
+        return creatorLinks[creator];
+    }
 }
