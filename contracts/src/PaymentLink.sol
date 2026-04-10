@@ -62,7 +62,7 @@ contract PaymentLink {
         uint256 paidAt
     ) {
         Link memory link = links[linkId];
-        return (link.creator, link.amount, link.description, link.paid, link.paidAt);
+        return (link.creator, link.amount, link.description, link.paid, link.payer, link.paidAt);
     }
 
     // Returns all linkIds created by a wallet.
