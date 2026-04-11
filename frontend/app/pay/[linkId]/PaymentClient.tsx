@@ -108,6 +108,7 @@ export default function PaymentClient({
   const { wallets } = useWallets();
   const { createWallet } = useCreateWallet();
   const hasInitialLink = Boolean(initialLink);
+  const invalidContractAddress = !ethers.isAddress(CONTRACT_ADDRESS);
 
   const [link, setLink] = useState<LinkDetails | null>(() =>
     initialLink ? deserializeLink(initialLink) : null,
@@ -123,6 +124,55 @@ export default function PaymentClient({
   const walletAddress = wallets[0]?.address ?? "";
   const amountLabel = useMemo(() => (link ? formatMON(link.amount) : ""), [link]);
   const receiptMode = Boolean(link?.paid || payState === "success");
+
+  if (invalidContractAddress) {
+    return (
+      <div
+        style={{
+          minHeight: "calc(100vh - 65px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "2rem 1rem",
+          boxSizing: "border-box",
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: "440px",
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            padding: "2rem",
+            textAlign: "center",
+          }}
+        >
+          <p
+            style={{
+              color: "var(--text)",
+              fontFamily: "'Syne', sans-serif",
+              fontSize: "20px",
+              fontWeight: 700,
+              margin: 0,
+            }}
+          >
+            Contract address not configured.
+          </p>
+          <p
+            style={{
+              color: "var(--text-muted)",
+              fontFamily: "'Inter', sans-serif",
+              fontSize: "14px",
+              margin: "1rem 0 0",
+            }}
+          >
+            Set NEXT_PUBLIC_CONTRACT_ADDRESS to a valid Monad Testnet contract address.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const goBack = useCallback(() => {
     if (window.history.length > 1) {

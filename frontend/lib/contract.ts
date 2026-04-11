@@ -1,4 +1,7 @@
-export const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!;
+const DEFAULT_CONTRACT_ADDRESS = "0x09c5b0e038b3c7607548ec33e7b413c2e5e69c21";
+
+export const CONTRACT_ADDRESS =
+  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS?.trim() || DEFAULT_CONTRACT_ADDRESS;
 
 export const CONTRACT_ABI = [
   "function createLink(bytes32 linkId, uint256 amount, string calldata description) external",

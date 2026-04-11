@@ -29,6 +29,12 @@ export default function HomePage() {
   async function handleSubmit() {
     setError("");
 
+    if (!ethers.isAddress(CONTRACT_ADDRESS)) {
+      setError("App is not configured with a valid contract address.");
+      toast("Missing contract address", "error");
+      return;
+    }
+
     if (!authenticated) {
       await login();
       return;
