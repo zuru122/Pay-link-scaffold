@@ -1,12 +1,10 @@
+import { ethers } from "ethers";
+
 export function generateLinkId(address: string): string {
-  const rand = Math.random().toString(36).substring(2);
-  const ts = Date.now().toString();
-  const raw = address + rand + ts;
-  let hash = 0;
-  for (let i = 0; i < raw.length; i++) {
-    hash = (Math.imul(31, hash) + raw.charCodeAt(i)) | 0;
-  }
-  return "0x" + Math.abs(hash).toString(16).padStart(64, "0");
+  return ethers.solidityPackedKeccak256(
+    ["address", "string", "string"],
+    [address, Math.random().toString(36).substring(2), Date.now().toString()],
+  );
 }
 
 export function truncateAddress(addr: string): string {
@@ -25,6 +23,5 @@ export function formatTimestamp(unix: number): string {
 }
 
 export function formatMON(wei: bigint): string {
-  const eth = Number(wei) / 1e18;
-  return `${eth.toFixed(2)} MON`;
+  return `${parseFloat(ethers.formatEther(wei)).toFixed(2)} MON`;
 }
