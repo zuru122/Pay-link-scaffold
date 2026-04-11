@@ -200,7 +200,7 @@ export default function HomePage() {
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="What&apos;s this payment for?"
+              placeholder="What's this payment for?"
               style={{
                 width: "100%",
                 background: "transparent",

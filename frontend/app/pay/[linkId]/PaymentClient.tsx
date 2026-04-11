@@ -124,10 +124,91 @@ export default function PaymentClient({
   const [paidAt, setPaidAt] = useState<bigint>(() =>
     initialLink ? BigInt(initialLink.paidAt) : BigInt(0),
   );
+  const [loadError, setLoadError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   const walletAddress = wallets[0]?.address ?? "";
   const amountLabel = useMemo(() => (link ? formatMON(link.amount) : ""), [link]);
   const receiptMode = Boolean(link?.paid || payState === "success");
+
+  const goBack = useCallback(() => {
+    if (window.history.length > 1) {
+      router.back();
+      return;
+    }
+
+    router.push("/");
+  }, [router]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLink() {
+      if (!hasInitialLink) setLoading(true);
+      setNotFound(false);
+      setLoadError(false);
+
+      try {
+        const provider = new ethers.JsonRpcProvider(
+          monadTestnet.rpcUrls.default.http[0],
+        );
+        const contract = new ethers.Contract(
+          CONTRACT_ADDRESS,
+          CONTRACT_ABI,
+          provider,
+        );
+        const [creator, amount, description, paid, payer, paidAtValue] =
+          (await withTimeout(
+            contract.getLink(linkId) as Promise<
+              [string, bigint, string, boolean, string, bigint]
+            >,
+            8000,
+          )) as [string, bigint, string, boolean, string, bigint];
+
+        if (cancelled) return;
+
+        if (!creator || creator.toLowerCase() === ZERO_ADDRESS) {
+          if (!hasInitialLink) {
+            setNotFound(true);
+            setLink(null);
+          }
+          return;
+        }
+
+        setLink({
+          creator,
+          amount,
+          description,
+          paid,
+          payer,
+          paidAt: paidAtValue,
+        });
+        setPaidAt(paidAtValue);
+
+        if (paid) {
+          try {
+            const existingTxHash = await findPaymentTxHash(linkId);
+            if (!cancelled) setTxHash(existingTxHash);
+          } catch {
+            if (!cancelled) setTxHash("");
+          }
+        }
+      } catch {
+        if (!cancelled && !hasInitialLink) {
+          setLoadError(true);
+          setLink(null);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadLink();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasInitialLink, linkId, retryCount]);
 
   if (invalidContractAddress) {
     return (
@@ -177,86 +258,6 @@ export default function PaymentClient({
       </div>
     );
   }
-
-  const goBack = useCallback(() => {
-    if (window.history.length > 1) {
-      router.back();
-      return;
-    }
-
-    router.push("/");
-  }, [router]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadLink() {
-      if (!hasInitialLink) setLoading(true);
-      setNotFound(false);
-
-      try {
-        const provider = new ethers.JsonRpcProvider(
-          monadTestnet.rpcUrls.default.http[0],
-        );
-        const contract = new ethers.Contract(
-          CONTRACT_ADDRESS,
-          CONTRACT_ABI,
-          provider,
-        );
-        const [creator, amount, description, paid, payer, paidAtValue] =
-          (await withTimeout(
-            contract.getLink(linkId) as Promise<
-              [string, bigint, string, boolean, string, bigint]
-            >,
-            8000,
-          )) as [string, bigint, string, boolean, string, bigint];
-
-        if (cancelled) return;
-
-        if (!creator || creator.toLowerCase() === ZERO_ADDRESS) {
-          if (!hasInitialLink) {
-            setNotFound(true);
-            setLink(null);
-          }
-          return;
-        }
-
-        setLink({
-          creator,
-          amount,
-          description,
-          paid,
-          payer,
-          paidAt: paidAtValue,
-        });
-        setPaidAt(paidAtValue);
-
-        if (paid) {
-          try {
-            const existingTxHash = await findPaymentTxHash(linkId);
-            if (!cancelled) setTxHash(existingTxHash);
-          } catch {
-            if (!cancelled) setTxHash("");
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          if (!hasInitialLink) {
-            setNotFound(true);
-            setLink(null);
-          }
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    loadLink();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [hasInitialLink, linkId]);
 
   async function handlePay() {
     if (!link || payState === "pending" || receiptMode) return;
@@ -403,6 +404,59 @@ export default function PaymentClient({
             >
               This link doesn&apos;t exist.
             </p>
+          </div>
+        )}
+
+        {!loading && loadError && (
+          <div
+            style={{
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius)",
+              padding: "2rem",
+              textAlign: "center",
+            }}
+          >
+            <p
+              style={{
+                color: "var(--text)",
+                fontFamily: "'Syne', sans-serif",
+                fontSize: "20px",
+                fontWeight: 700,
+                margin: 0,
+              }}
+            >
+              Network error.
+            </p>
+            <p
+              style={{
+                color: "var(--text-muted)",
+                fontFamily: "'Inter', sans-serif",
+                fontSize: "14px",
+                margin: "0.75rem 0 0",
+              }}
+            >
+              Could not reach the network. Check your connection and try again.
+            </p>
+            <button
+              type="button"
+              onClick={() => setRetryCount((c) => c + 1)}
+              style={{
+                background: "var(--primary)",
+                border: "none",
+                borderRadius: "var(--radius)",
+                color: "var(--text)",
+                cursor: "pointer",
+                fontFamily: "'Syne', sans-serif",
+                fontSize: "15px",
+                fontWeight: 700,
+                marginTop: "1.25rem",
+                minHeight: "44px",
+                padding: "0 1.5rem",
+              }}
+            >
+              Try again
+            </button>
           </div>
         )}
 
