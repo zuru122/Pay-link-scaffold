@@ -82,7 +82,7 @@ A freelancer creates a payment link in seconds. Anyone opens it, logs in with Go
 
 ```
 paylink/
-├── GUIDE.md                          ← you are here
+├── Guide.md                          ← you are here
 ├── .gitignore
 ├── README.md
 │
@@ -98,7 +98,7 @@ paylink/
 │
 └── frontend/                         ← P2 and P3 share this
     ├── .env.local                    ← Privy + contract address (never commit)
-    ├── next.config.ts
+    ├── next.config.mjs
     ├── tailwind.config.ts
     ├── tsconfig.json
     │
