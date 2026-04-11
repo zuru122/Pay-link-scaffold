@@ -14,9 +14,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <PrivyProvider
       appId={PRIVY_APP_ID}
       config={{
-        loginMethods: ["google", "email"],
+        loginMethods: ["wallet", "google", "email"],
         embeddedWallets: {
-          ethereum: { createOnLogin: "all-users" },
+          ethereum: { createOnLogin: "users-without-wallets" },
         },
         defaultChain: monadTestnet,
         supportedChains: [monadTestnet],

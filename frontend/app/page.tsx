@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { useCreateWallet, usePrivy, useWallets } from "@privy-io/react-auth";
 import { ethers } from "ethers";
 import Link from "next/link";
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from "@/lib/contract";
@@ -12,6 +12,7 @@ type PageState = "form" | "loading" | "success";
 export default function HomePage() {
   const { ready, authenticated, login } = usePrivy();
   const { wallets } = useWallets();
+  const { createWallet } = useCreateWallet();
 
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
@@ -31,16 +32,11 @@ export default function HomePage() {
       return;
     }
 
-    const embeddedWallet = wallets.find((w) => w.walletClientType === "privy");
-    if (!embeddedWallet) {
-      setError("No embedded wallet found. Please log in again.");
-      return;
-    }
-
     setState("loading");
 
     try {
-      const ethereumProvider = await embeddedWallet.getEthereumProvider();
+      const wallet = wallets[0] ?? (await createWallet());
+      const ethereumProvider = await wallet.getEthereumProvider();
       const provider = new ethers.BrowserProvider(ethereumProvider);
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
@@ -71,7 +67,7 @@ export default function HomePage() {
           return;
         }
       }
-      setError("Something went wrong. Try again.");
+      setError("Connect an existing wallet or create a new one to continue.");
     }
   }
 
