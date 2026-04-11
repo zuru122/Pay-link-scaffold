@@ -6,3 +6,4 @@ contracts/out/
 contracts/cache/
 .next/
 dist/
+*.zip

@@ -60,11 +60,15 @@ export default function Navbar() {
             <Link
               href="/history"
               style={{
+                alignItems: "center",
                 color: "var(--text-muted)",
+                display: "inline-flex",
                 fontFamily: "'Inter', sans-serif",
                 fontSize: "0.875rem",
+                minHeight: "44px",
+                textDecoration: "none",
               }}
-              className="hidden transition hover:text-[var(--text)] sm:inline"
+              className="transition hover:text-[var(--text)]"
             >
               History
             </Link>

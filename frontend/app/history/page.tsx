@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { ethers } from "ethers";
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from "@/lib/contract";
@@ -13,6 +14,7 @@ import { monadTestnet } from "@/lib/wagmi";
 type HistoryLink = {
   linkId: string;
   creator: string;
+  direction: "inflow" | "outflow";
   amount: bigint;
   description: string;
   paid: boolean;
@@ -20,6 +22,11 @@ type HistoryLink = {
   paidAt: bigint;
   createdAt: bigint;
   paidTxHash: string;
+};
+
+type HistoryItem = {
+  direction: HistoryLink["direction"];
+  linkId: string;
 };
 
 const LINK_CREATED_TOPIC = ethers.id(
@@ -59,6 +66,23 @@ function formatPaidLine(payer: string, paidAt: bigint) {
   return `Paid by ${payerLabel} - ${dateLabel}`;
 }
 
+function formatCounterpartyLine(item: HistoryLink) {
+  const dateLabel =
+    item.paidAt === BigInt(0)
+      ? "on-chain"
+      : formatTimestamp(Number(item.paidAt)).replace(",", "");
+
+  if (item.direction === "outflow") {
+    return `Paid to ${truncateAddress(item.creator)} - ${dateLabel}`;
+  }
+
+  return formatPaidLine(item.payer, item.paidAt);
+}
+
+function getTime(item: HistoryLink) {
+  return item.paid ? item.paidAt : item.createdAt;
+}
+
 async function getLogTimestamp(
   provider: ethers.JsonRpcProvider,
   log: ethers.Log,
@@ -72,35 +96,124 @@ async function getCreatedAt(
   linkId: string,
   creator: string,
 ) {
-  const logs = await provider.getLogs({
-    address: CONTRACT_ADDRESS,
-    topics: [
-      LINK_CREATED_TOPIC,
-      linkId,
-      ethers.zeroPadValue(creator, 32),
-    ],
-    fromBlock: 0,
-    toBlock: "latest",
-  });
+  try {
+    const logs = await provider.getLogs({
+      address: CONTRACT_ADDRESS,
+      topics: [
+        LINK_CREATED_TOPIC,
+        linkId,
+        ethers.zeroPadValue(creator, 32),
+      ],
+      fromBlock: 0,
+      toBlock: "latest",
+    });
 
-  const createdLog = logs.at(-1);
-  if (!createdLog) return BigInt(0);
+    const createdLog = logs.at(-1);
+    if (!createdLog) return BigInt(0);
 
-  return getLogTimestamp(provider, createdLog);
+    return getLogTimestamp(provider, createdLog);
+  } catch {
+    return BigInt(0);
+  }
+}
+
+async function getCreatorLinkIdsFromLogs(
+  provider: ethers.JsonRpcProvider,
+  creator: string,
+) {
+  try {
+    const logs = await provider.getLogs({
+      address: CONTRACT_ADDRESS,
+      topics: [LINK_CREATED_TOPIC, null, ethers.zeroPadValue(creator, 32)],
+      fromBlock: 0,
+      toBlock: "latest",
+    });
+
+    return logs
+      .map((log) => log.topics[1])
+      .filter((linkId): linkId is string => Boolean(linkId));
+  } catch {
+    return [];
+  }
+}
+
+async function getPaidLogsByPayer(
+  provider: ethers.JsonRpcProvider,
+  payer: string,
+) {
+  try {
+    return await provider.getLogs({
+      address: CONTRACT_ADDRESS,
+      topics: [LINK_PAID_TOPIC, null, ethers.zeroPadValue(payer, 32)],
+      fromBlock: 0,
+      toBlock: "latest",
+    });
+  } catch {
+    return [];
+  }
 }
 
 async function getPaidTxHash(provider: ethers.JsonRpcProvider, linkId: string) {
-  const logs = await provider.getLogs({
-    address: CONTRACT_ADDRESS,
-    topics: [LINK_PAID_TOPIC, linkId],
-    fromBlock: 0,
-    toBlock: "latest",
-  });
+  try {
+    const logs = await provider.getLogs({
+      address: CONTRACT_ADDRESS,
+      topics: [LINK_PAID_TOPIC, linkId],
+      fromBlock: 0,
+      toBlock: "latest",
+    });
 
-  return logs.at(-1)?.transactionHash ?? "";
+    return logs.at(-1)?.transactionHash ?? "";
+  } catch {
+    return "";
+  }
+}
+
+async function getCreatorLinkIds(
+  contract: ethers.Contract,
+  creator: string,
+) {
+  try {
+    return Array.from((await contract.getCreatorLinks(creator)) as string[]);
+  } catch {
+    return [];
+  }
+}
+
+async function getHistoryLink(
+  contract: ethers.Contract,
+  item: HistoryItem,
+  paidTxHashes: Map<string, string>,
+) {
+  try {
+    const [creator, amount, description, paid, payer, paidAt] =
+      (await contract.getLink(item.linkId)) as [
+        string,
+        bigint,
+        string,
+        boolean,
+        string,
+        bigint,
+      ];
+
+    return {
+      linkId: item.linkId,
+      creator,
+      direction: item.direction,
+      amount,
+      description,
+      paid,
+      payer,
+      paidAt,
+      createdAt: BigInt(0),
+      paidTxHash: paidTxHashes.get(item.linkId) ?? "",
+    } satisfies HistoryLink;
+  } catch {
+    return null;
+  }
 }
 
 export default function HistoryPage() {
+  const router = useRouter();
   const { authenticated, login, ready } = usePrivy();
   const { wallets } = useWallets();
   const walletAddress = wallets[0]?.address ?? "";
@@ -110,15 +223,22 @@ export default function HistoryPage() {
 
   const sortedHistory = useMemo(() => {
     return [...history].sort((a, b) => {
-      if (a.paid !== b.paid) return a.paid ? -1 : 1;
-
-      const aTime = a.paid ? a.paidAt : a.createdAt;
-      const bTime = b.paid ? b.paidAt : b.createdAt;
+      const aTime = getTime(a);
+      const bTime = getTime(b);
       if (aTime === bTime) return 0;
 
       return aTime > bTime ? -1 : 1;
     });
   }, [history]);
+
+  const goBack = useCallback(() => {
+    if (window.history.length > 1) {
+      router.back();
+      return;
+    }
+
+    router.push("/");
+  }, [router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,39 +262,67 @@ export default function HistoryPage() {
           CONTRACT_ABI,
           provider,
         );
-        const linkIds = (await contract.getCreatorLinks(walletAddress)) as string[];
+        const [creatorLinkIds, createdLogLinkIds, paidLogs] =
+          await Promise.all([
+            getCreatorLinkIds(contract, walletAddress),
+            getCreatorLinkIdsFromLogs(provider, walletAddress),
+            getPaidLogsByPayer(provider, walletAddress),
+          ]);
+        const paidTxHashes = new Map<string, string>();
+        const paidLinkIds = paidLogs
+          .map((log) => {
+            const linkId = log.topics[1];
+            if (linkId) paidTxHashes.set(linkId, log.transactionHash);
+            return linkId;
+          })
+          .filter((linkId): linkId is string => Boolean(linkId));
+        const inflowLinkIds = Array.from(
+          new Set([...creatorLinkIds, ...createdLogLinkIds]),
+        );
+        const outflowLinkIds = paidLinkIds.filter(
+          (linkId) => !inflowLinkIds.includes(linkId),
+        );
+        const historyItems: HistoryItem[] = [
+          ...inflowLinkIds.map((linkId) => ({
+            direction: "inflow" as const,
+            linkId,
+          })),
+          ...outflowLinkIds.map((linkId) => ({
+            direction: "outflow" as const,
+            linkId,
+          })),
+        ];
 
-        const links = await Promise.all(
-          linkIds.map(async (linkId) => {
-            const [creator, amount, description, paid, payer, paidAt] =
-              (await contract.getLink(linkId)) as [
-                string,
-                bigint,
-                string,
-                boolean,
-                string,
-                bigint,
-              ];
+        const links = (
+          await Promise.all(
+            historyItems.map((item) =>
+              getHistoryLink(contract, item, paidTxHashes),
+            ),
+          )
+        ).filter((link): link is HistoryLink => Boolean(link));
+
+        if (cancelled) return;
+
+        setHistory(links);
+
+        const enrichedLinks = await Promise.all(
+          links.map(async (link) => {
             const [createdAt, paidTxHash] = await Promise.all([
-              getCreatedAt(provider, linkId, creator),
-              paid ? getPaidTxHash(provider, linkId) : Promise.resolve(""),
+              getCreatedAt(provider, link.linkId, link.creator),
+              link.paid && !link.paidTxHash
+                ? getPaidTxHash(provider, link.linkId)
+                : Promise.resolve(link.paidTxHash),
             ]);
 
             return {
-              linkId,
-              creator,
-              amount,
-              description,
-              paid,
-              payer,
-              paidAt,
+              ...link,
               createdAt,
               paidTxHash,
             };
           }),
         );
 
-        if (!cancelled) setHistory(links);
+        if (!cancelled) setHistory(enrichedLinks);
       } catch {
         if (!cancelled) {
           setHistory([]);
@@ -258,21 +406,57 @@ export default function HistoryPage() {
             </p>
           </div>
 
-          {authenticated && walletAddress && (
-            <span
+          <div
+            className="history-header-actions"
+            style={{
+              alignItems: "center",
+              display: "flex",
+              flexShrink: 0,
+              flexWrap: "wrap",
+              gap: "0.75rem",
+              justifyContent: "flex-end",
+            }}
+          >
+            <button
+              type="button"
+              onClick={goBack}
               style={{
+                background: "transparent",
                 border: "1px solid var(--border)",
                 borderRadius: "8px",
                 color: "var(--highlight)",
-                flexShrink: 0,
-                fontFamily: "'JetBrains Mono', monospace",
-                fontSize: "12px",
-                padding: "0.6rem 0.75rem",
+                cursor: "pointer",
+                fontFamily: "'Inter', sans-serif",
+                fontSize: "14px",
+                minHeight: "44px",
+                padding: "0 1rem",
+                transition: "box-shadow var(--transition)",
+              }}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.boxShadow = "var(--glow-purple)";
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.boxShadow = "none";
               }}
             >
-              {truncateAddress(walletAddress)}
-            </span>
-          )}
+              Back
+            </button>
+
+            {authenticated && walletAddress && (
+              <span
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: "8px",
+                  color: "var(--highlight)",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: "12px",
+                  padding: "0.6rem 0.75rem",
+                }}
+              >
+                {truncateAddress(walletAddress)}
+              </span>
+            )}
+          </div>
         </header>
 
         {!authenticated ? (
@@ -285,7 +469,7 @@ export default function HistoryPage() {
           <section style={{ display: "grid", gap: "1rem" }}>
             {sortedHistory.map((item, index) => (
               <HistoryCard
-                key={item.linkId}
+                key={`${item.direction}-${item.linkId}`}
                 item={item}
                 index={index}
                 onCopy={copyLink}
@@ -316,6 +500,11 @@ export default function HistoryPage() {
           .history-header {
             align-items: flex-start;
             flex-direction: column;
+          }
+
+          .history-header-actions {
+            justify-content: flex-start;
+            width: 100%;
           }
         }
       `}</style>
@@ -472,6 +661,12 @@ function HistoryCard({
   onShare: (linkId: string, description: string) => Promise<void>;
 }) {
   const isPaid = item.paid;
+  const isOutflow = item.direction === "outflow";
+  const amountColor = !isPaid
+    ? "var(--text-muted)"
+    : isOutflow
+      ? "var(--text)"
+      : "var(--success)";
 
   return (
     <article
@@ -481,9 +676,11 @@ function HistoryCard({
         animationDelay: `${index * 60}ms`,
         background: "var(--surface)",
         border: "1px solid var(--border)",
-        borderLeft: isPaid
-          ? "3px solid var(--success)"
-          : "3px solid var(--border)",
+        borderLeft: !isPaid
+          ? "3px solid var(--border)"
+          : isOutflow
+            ? "3px solid var(--highlight)"
+            : "3px solid var(--success)",
         borderRadius: "var(--radius)",
         display: "grid",
         gap: "1rem",
@@ -492,7 +689,7 @@ function HistoryCard({
         transition: "box-shadow var(--transition), transform var(--transition)",
       }}
     >
-      <StatusIcon paid={isPaid} />
+      <StatusIcon direction={item.direction} paid={isPaid} />
       <div style={{ minWidth: 0 }}>
         <div
           style={{
@@ -515,18 +712,19 @@ function HistoryCard({
           >
             {item.description || "Untitled payment"}
           </h2>
-          {!isPaid && <AwaitingBadge />}
+          <TransactionBadge direction={item.direction} paid={isPaid} />
         </div>
 
         <p
           style={{
-            color: isPaid ? "var(--success)" : "var(--text-muted)",
+            color: amountColor,
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: "16px",
             fontWeight: 500,
             margin: "0.45rem 0 0",
           }}
         >
+          {isPaid ? (isOutflow ? "-" : "+") : ""}
           {formatMON(item.amount)}
         </p>
 
@@ -540,7 +738,7 @@ function HistoryCard({
           }}
         >
           {isPaid
-            ? formatPaidLine(item.payer, item.paidAt)
+            ? formatCounterpartyLine(item)
             : `Awaiting payment - ${formatCreatedDate(item.createdAt)}`}
         </p>
 
@@ -582,7 +780,13 @@ function HistoryCard({
   );
 }
 
-function StatusIcon({ paid }: { paid: boolean }) {
+function StatusIcon({
+  direction,
+  paid,
+}: {
+  direction: HistoryLink["direction"];
+  paid: boolean;
+}) {
   if (!paid) {
     return (
       <svg
@@ -593,6 +797,33 @@ function StatusIcon({ paid }: { paid: boolean }) {
         fill="none"
       >
         <circle cx="14" cy="14" r="10" stroke="var(--border)" strokeWidth="2" />
+      </svg>
+    );
+  }
+
+  if (direction === "outflow") {
+    return (
+      <svg
+        aria-hidden="true"
+        width="28"
+        height="28"
+        viewBox="0 0 28 28"
+        fill="none"
+      >
+        <circle
+          cx="14"
+          cy="14"
+          r="12"
+          fill="var(--highlight)"
+          fillOpacity="0.15"
+        />
+        <path
+          d="M9 19 19 9M12 9h7v7"
+          stroke="var(--highlight)"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+        />
       </svg>
     );
   }
@@ -617,21 +848,38 @@ function StatusIcon({ paid }: { paid: boolean }) {
   );
 }
 
-function AwaitingBadge() {
+function TransactionBadge({
+  direction,
+  paid,
+}: {
+  direction: HistoryLink["direction"];
+  paid: boolean;
+}) {
+  const label = !paid
+    ? "Pending"
+    : direction === "outflow"
+      ? "Outflow"
+      : "Inflow";
+  const color = !paid
+    ? "var(--highlight)"
+    : direction === "outflow"
+      ? "var(--highlight)"
+      : "var(--success)";
+
   return (
     <span
       style={{
         background: "var(--surface)",
         border: "1px solid var(--border)",
         borderRadius: "8px",
-        color: "var(--highlight)",
+        color,
         flexShrink: 0,
         fontFamily: "'Inter', sans-serif",
         fontSize: "12px",
         padding: "0.25rem 0.5rem",
       }}
     >
-      Awaiting
+      {label}
     </span>
   );
 }
