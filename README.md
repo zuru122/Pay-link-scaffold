@@ -7,7 +7,7 @@
 - P3: UX & Components
 
 ## Setup
-1. Read GUIDE.md before writing any code
+1. Read Guide.md before writing any code
 2. P1: cd contracts && forge install && forge test
 3. P2: cd frontend && npm install
 4. P2: Copy .env.local.example to .env.local and fill values

@@ -6,6 +6,7 @@ import { ethers } from "ethers";
 import Link from "next/link";
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from "@/lib/contract";
 import { generateLinkId } from "@/lib/utils";
+import { ensureMonadTestnet } from "@/lib/walletNetwork";
 
 type PageState = "form" | "loading" | "success";
 
@@ -37,6 +38,7 @@ export default function HomePage() {
     try {
       const wallet = wallets[0] ?? (await createWallet());
       const ethereumProvider = await wallet.getEthereumProvider();
+      await ensureMonadTestnet(ethereumProvider);
       const provider = new ethers.BrowserProvider(ethereumProvider);
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
@@ -83,6 +85,12 @@ export default function HomePage() {
     } else {
       await handleCopy();
     }
+  }
+
+  function handleBackToForm() {
+    setCopied(false);
+    setError("");
+    setState("form");
   }
 
   return (
@@ -394,36 +402,75 @@ export default function HomePage() {
             </div>
 
             {/* Share button */}
-            <button
-              onClick={handleShare}
+            <div
               style={{
-                width: "100%",
-                height: "48px",
-                background: "transparent",
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius)",
-                fontFamily: "'Syne', sans-serif",
-                fontWeight: 600,
-                fontSize: "15px",
-                color: "var(--highlight)",
-                cursor: "pointer",
-                transition:
-                  "box-shadow var(--transition), border-color var(--transition)",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                  "var(--glow-purple)";
-                (e.currentTarget as HTMLButtonElement).style.borderColor =
-                  "var(--primary)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
-                (e.currentTarget as HTMLButtonElement).style.borderColor =
-                  "var(--border)";
+                display: "grid",
+                gap: "0.75rem",
               }}
             >
-              Share Link
-            </button>
+              <button
+                onClick={handleShare}
+                style={{
+                  width: "100%",
+                  height: "48px",
+                  background: "transparent",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius)",
+                  fontFamily: "'Syne', sans-serif",
+                  fontWeight: 600,
+                  fontSize: "15px",
+                  color: "var(--highlight)",
+                  cursor: "pointer",
+                  transition:
+                    "box-shadow var(--transition), border-color var(--transition)",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                    "var(--glow-purple)";
+                  (e.currentTarget as HTMLButtonElement).style.borderColor =
+                    "var(--primary)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
+                  (e.currentTarget as HTMLButtonElement).style.borderColor =
+                    "var(--border)";
+                }}
+              >
+                Share Link
+              </button>
+
+              <button
+                type="button"
+                onClick={handleBackToForm}
+                style={{
+                  width: "100%",
+                  height: "48px",
+                  background: "transparent",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius)",
+                  fontFamily: "'Inter', sans-serif",
+                  fontWeight: 500,
+                  fontSize: "14px",
+                  color: "var(--text-muted)",
+                  cursor: "pointer",
+                  transition:
+                    "box-shadow var(--transition), border-color var(--transition)",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                    "var(--glow-purple)";
+                  (e.currentTarget as HTMLButtonElement).style.borderColor =
+                    "var(--primary)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
+                  (e.currentTarget as HTMLButtonElement).style.borderColor =
+                    "var(--border)";
+                }}
+              >
+                Back to form
+              </button>
+            </div>
 
             {/* History nudge */}
             <p
