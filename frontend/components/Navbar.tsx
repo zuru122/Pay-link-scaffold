@@ -64,7 +64,7 @@ export default function Navbar() {
                 fontFamily: "'Inter', sans-serif",
                 fontSize: "0.875rem",
               }}
-              className="transition hover:text-[var(--text)]"
+              className="hidden transition hover:text-[var(--text)] sm:inline"
             >
               History
             </Link>

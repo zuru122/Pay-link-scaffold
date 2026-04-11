@@ -5,6 +5,7 @@ import { useCreateWallet, usePrivy, useWallets } from "@privy-io/react-auth";
 import { ethers } from "ethers";
 import Link from "next/link";
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from "@/lib/contract";
+import { toast } from "@/hooks/useToast";
 import { generateLinkId } from "@/lib/utils";
 import { ensureMonadTestnet } from "@/lib/walletNetwork";
 
@@ -34,6 +35,7 @@ export default function HomePage() {
     }
 
     setState("loading");
+    toast("Creating link...", "info");
 
     try {
       const wallet = wallets[0] ?? (await createWallet());
@@ -60,22 +62,26 @@ export default function HomePage() {
       const url = `${window.location.origin}/pay/${linkId}`;
       setCreatedUrl(url);
       setState("success");
+      toast("Link created!", "success");
     } catch (err: unknown) {
       setState("form");
       if (err && typeof err === "object" && "code" in err) {
         const code = (err as { code: string }).code;
         if (code === "ACTION_REJECTED") {
           setError("Transaction rejected.");
+          toast("Transaction failed", "error");
           return;
         }
       }
       setError("Connect an existing wallet or create a new one to continue.");
+      toast("Transaction failed", "error");
     }
   }
 
   async function handleCopy() {
     await navigator.clipboard.writeText(createdUrl);
     setCopied(true);
+    toast("Link copied!", "success");
     setTimeout(() => setCopied(false), 2000);
   }
 

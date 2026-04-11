@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCreateWallet, usePrivy, useWallets } from "@privy-io/react-auth";
 import { ethers } from "ethers";
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from "@/lib/contract";
+import { toast } from "@/hooks/useToast";
 import { formatMON, truncateAddress } from "@/lib/utils";
 import { monadTestnet } from "@/lib/wagmi";
 import { ensureMonadTestnet } from "@/lib/walletNetwork";
@@ -17,11 +18,6 @@ type LinkDetails = {
   paid: boolean;
   payer: string;
   paidAt: bigint;
-};
-
-type Toast = {
-  message: string;
-  type: "info" | "error";
 };
 
 type PayState = "idle" | "pending" | "success";
@@ -75,32 +71,13 @@ export default function PayPage({ params }: { params: { linkId: string } }) {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [payState, setPayState] = useState<PayState>("idle");
-  const [toast, setToast] = useState<Toast | null>(null);
   const [txHash, setTxHash] = useState("");
   const [paidAt, setPaidAt] = useState<bigint>(BigInt(0));
-  const toastTimeout = useRef<number | null>(null);
 
   const linkId = params.linkId;
   const walletAddress = wallets[0]?.address ?? "";
   const amountLabel = useMemo(() => (link ? formatMON(link.amount) : ""), [link]);
   const receiptMode = Boolean(link?.paid || payState === "success");
-
-  const showToast = useCallback((message: string, type: Toast["type"]) => {
-    if (toastTimeout.current) {
-      window.clearTimeout(toastTimeout.current);
-    }
-
-    setToast({ message, type });
-    toastTimeout.current = window.setTimeout(() => setToast(null), 3200);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (toastTimeout.current) {
-        window.clearTimeout(toastTimeout.current);
-      }
-    };
-  }, []);
 
   const goBack = useCallback(() => {
     if (window.history.length > 1) {
@@ -184,12 +161,13 @@ export default function PayPage({ params }: { params: { linkId: string } }) {
     if (!link || payState === "pending" || receiptMode) return;
 
     if (!authenticated) {
+      toast("Connecting wallet...", "info");
       await login();
       return;
     }
 
     setPayState("pending");
-    showToast("Confirm in your wallet...", "info");
+    toast("Confirm in your wallet...", "info");
 
     try {
       const wallet = wallets[0] ?? (await createWallet());
@@ -215,23 +193,31 @@ export default function PayPage({ params }: { params: { linkId: string } }) {
         paidAt: paymentTime,
       });
       setPayState("success");
+      toast("Payment confirmed!", "success");
     } catch (err: unknown) {
       setPayState("idle");
       if (err && typeof err === "object" && "code" in err) {
         const code = (err as { code?: string | number }).code;
         if (code === "ACTION_REJECTED" || code === "4001" || code === 4001) {
-          showToast("Transaction rejected", "error");
+          toast("Transaction rejected", "error");
           return;
         }
       }
       if (
         err instanceof Error &&
-        err.message.toLowerCase().includes("user rejected")
+        err.message.toLowerCase().includes("chain")
       ) {
-        showToast("Transaction rejected", "error");
+        toast("Switch to Monad Testnet", "error");
         return;
       }
-      showToast("Network error. Try again.", "error");
+      if (
+        err instanceof Error &&
+        err.message.toLowerCase().includes("user rejected")
+      ) {
+        toast("Transaction rejected", "error");
+        return;
+      }
+      toast("Network error. Try again.", "error");
     }
   }
 
@@ -399,33 +385,6 @@ export default function PayPage({ params }: { params: { linkId: string } }) {
           </div>
         )}
       </div>
-
-      {toast && (
-        <div
-          role="status"
-          style={{
-            background: "var(--surface)",
-            border: `1px solid ${
-              toast.type === "error" ? "var(--error)" : "var(--border)"
-            }`,
-            borderRadius: "8px",
-            bottom: "1rem",
-            boxShadow:
-              toast.type === "error" ? "none" : "var(--glow-purple)",
-            color: toast.type === "error" ? "var(--error)" : "var(--highlight)",
-            fontFamily: "'Inter', sans-serif",
-            fontSize: "14px",
-            left: "50%",
-            maxWidth: "calc(100% - 2rem)",
-            padding: "0.8rem 1rem",
-            position: "fixed",
-            transform: "translateX(-50%)",
-            zIndex: 20,
-          }}
-        >
-          {toast.message}
-        </div>
-      )}
 
       <style>{`
         @keyframes amountPulse {

@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { ethers } from "ethers";
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from "@/lib/contract";
+import { toast } from "@/hooks/useToast";
 import { formatMON, formatTimestamp, truncateAddress } from "@/lib/utils";
 import { monadTestnet } from "@/lib/wagmi";
 
@@ -19,11 +20,6 @@ type HistoryLink = {
   paidAt: bigint;
   createdAt: bigint;
   paidTxHash: string;
-};
-
-type Toast = {
-  message: string;
-  type: "info" | "error" | "success";
 };
 
 const LINK_CREATED_TOPIC = ethers.id(
@@ -111,8 +107,6 @@ export default function HistoryPage() {
 
   const [history, setHistory] = useState<HistoryLink[]>([]);
   const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState<Toast | null>(null);
-  const toastTimeout = useRef<number | null>(null);
 
   const sortedHistory = useMemo(() => {
     return [...history].sort((a, b) => {
@@ -126,23 +120,6 @@ export default function HistoryPage() {
     });
   }, [history]);
 
-  const showToast = useCallback((message: string, type: Toast["type"]) => {
-    if (toastTimeout.current) {
-      window.clearTimeout(toastTimeout.current);
-    }
-
-    setToast({ message, type });
-    toastTimeout.current = window.setTimeout(() => setToast(null), 2400);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (toastTimeout.current) {
-        window.clearTimeout(toastTimeout.current);
-      }
-    };
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
 
@@ -154,6 +131,7 @@ export default function HistoryPage() {
       }
 
       setLoading(true);
+      toast("Loading history...", "info");
 
       try {
         const provider = new ethers.JsonRpcProvider(
@@ -200,7 +178,7 @@ export default function HistoryPage() {
       } catch {
         if (!cancelled) {
           setHistory([]);
-          showToast("Network error. Try again.", "error");
+          toast("Network error. Try again.", "error");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -212,11 +190,11 @@ export default function HistoryPage() {
     return () => {
       cancelled = true;
     };
-  }, [authenticated, showToast, walletAddress]);
+  }, [authenticated, walletAddress]);
 
   async function copyLink(linkId: string) {
     await navigator.clipboard.writeText(paymentUrl(linkId));
-    showToast("Copied!", "success");
+    toast("Copied!", "success");
   }
 
   async function shareLink(linkId: string, description: string) {
@@ -317,41 +295,6 @@ export default function HistoryPage() {
           </section>
         )}
       </main>
-
-      {toast && (
-        <div
-          role="status"
-          style={{
-            background: "var(--surface)",
-            border: `1px solid ${
-              toast.type === "error"
-                ? "var(--error)"
-                : toast.type === "success"
-                  ? "var(--success)"
-                  : "var(--border)"
-            }`,
-            borderRadius: "8px",
-            bottom: "1rem",
-            boxShadow: toast.type === "error" ? "none" : "var(--glow-purple)",
-            color:
-              toast.type === "error"
-                ? "var(--error)"
-                : toast.type === "success"
-                  ? "var(--success)"
-                  : "var(--highlight)",
-            fontFamily: "'Inter', sans-serif",
-            fontSize: "14px",
-            left: "50%",
-            maxWidth: "calc(100% - 2rem)",
-            padding: "0.8rem 1rem",
-            position: "fixed",
-            transform: "translateX(-50%)",
-            zIndex: 20,
-          }}
-        >
-          {toast.message}
-        </div>
-      )}
 
       <style>{`
         @keyframes historyCardIn {

@@ -1,12 +1,20 @@
 import type { Metadata } from "next";
 import Navbar from "@/components/Navbar";
+import { Toaster } from "@/components/ui/Toast";
 import Providers from "@/providers/PrivyProvider";
 import "@/styles/globals.css";
 
 export const metadata: Metadata = {
-  title: "PayLink",
-  description:
-    "Stripe invoices for the permissionless web — with on-chain proof of every transaction.",
+  title: {
+    default: "PayLink — Get paid with a link",
+    template: "%s",
+  },
+  description: "Instant on-chain payments with permanent receipts. Powered by Monad.",
+  openGraph: {
+    description:
+      "Instant on-chain payments with permanent receipts. Powered by Monad.",
+    title: "PayLink — Get paid with a link",
+  },
 };
 
 export default function RootLayout({
@@ -32,6 +40,7 @@ export default function RootLayout({
         <Providers>
           <Navbar />
           <main>{children}</main>
+          <Toaster />
         </Providers>
       </body>
     </html>
