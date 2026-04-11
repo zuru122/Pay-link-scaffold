@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useCreateWallet, usePrivy, useWallets } from "@privy-io/react-auth";
+import {
+  useCreateWalletSafe,
+  usePrivySafe,
+  useWalletsSafe,
+} from "@/hooks/usePrivySafe";
 import { ethers } from "ethers";
 import Link from "next/link";
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from "@/lib/contract";
@@ -12,9 +16,9 @@ import { ensureMonadTestnet } from "@/lib/walletNetwork";
 type PageState = "form" | "loading" | "success";
 
 export default function HomePage() {
-  const { ready, authenticated, login } = usePrivy();
-  const { wallets } = useWallets();
-  const { createWallet } = useCreateWallet();
+  const { ready, authenticated, login } = usePrivySafe();
+  const { wallets } = useWalletsSafe();
+  const { createWallet } = useCreateWalletSafe();
 
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");

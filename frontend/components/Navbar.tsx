@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { usePrivySafe, useWalletsSafe } from "@/hooks/usePrivySafe";
 import { truncateAddress } from "@/lib/utils";
 
 export default function Navbar() {
-  const { authenticated, login, logout, ready } = usePrivy();
-  const { wallets } = useWallets();
+  const { authenticated, login, logout, ready } = usePrivySafe();
+  const { wallets } = useWalletsSafe();
   const walletAddress = wallets[0]?.address;
 
   return (

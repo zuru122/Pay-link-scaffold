@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { usePrivySafe, useWalletsSafe } from "@/hooks/usePrivySafe";
 import { ethers } from "ethers";
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from "@/lib/contract";
 import { toast } from "@/hooks/useToast";
@@ -214,8 +214,8 @@ async function getHistoryLink(
 
 export default function HistoryPage() {
   const router = useRouter();
-  const { authenticated, login, ready } = usePrivy();
-  const { wallets } = useWallets();
+  const { authenticated, login, ready } = usePrivySafe();
+  const { wallets } = useWalletsSafe();
   const walletAddress = wallets[0]?.address ?? "";
 
   const [history, setHistory] = useState<HistoryLink[]>([]);

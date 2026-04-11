@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useCreateWallet, usePrivy, useWallets } from "@privy-io/react-auth";
+import {
+  useCreateWalletSafe,
+  usePrivySafe,
+  useWalletsSafe,
+} from "@/hooks/usePrivySafe";
 import { ethers } from "ethers";
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from "@/lib/contract";
 import { toast } from "@/hooks/useToast";
@@ -104,9 +108,9 @@ export default function PaymentClient({
   linkId: string;
 }) {
   const router = useRouter();
-  const { ready, authenticated, login } = usePrivy();
-  const { wallets } = useWallets();
-  const { createWallet } = useCreateWallet();
+  const { ready, authenticated, login } = usePrivySafe();
+  const { wallets } = useWalletsSafe();
+  const { createWallet } = useCreateWalletSafe();
   const hasInitialLink = Boolean(initialLink);
   const invalidContractAddress = !ethers.isAddress(CONTRACT_ADDRESS);
 
